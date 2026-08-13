@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>TalentGraph - 个人评估诊断报告</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    @page { size: A4 portrait; margin: 10mm 12mm; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #fff; color: #1e293b; }
+    .page-break { page-break-inside: avoid; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body class="p-4 max-w-4xl mx-auto space-y-5">
+  <!-- Report Header -->
+  <div class="border-b-2 border-indigo-600 pb-3 flex justify-between items-end">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">无领导小组讨论 · 个人能力量化诊断报告</h1>
+      <p class="text-xs text-slate-500 mt-1">TalentGraph · 基于 16 维因果影响图谱与拓扑网络建模</p>
+    </div>
+    <div class="text-right">
+      <span id="print-date" class="text-xs font-mono text-slate-400">报告生成: 2026-08-13</span>
+    </div>
+  </div>
+
+  <!-- Candidate Summary Banner -->
+  <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 flex justify-between items-center">
+    <div>
+      <div class="flex items-center space-x-3">
+        <h2 id="print-name" class="text-xl font-bold text-slate-900">候选人</h2>
+        <span id="print-rank" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">全场综合第 - 名</span>
+      </div>
+      <div id="print-tags" class="flex gap-1.5 mt-2">
+        <!-- Tags dynamically injected -->
+      </div>
+    </div>
+    <div class="text-right">
+      <p class="text-xs text-slate-400">综合评估总分</p>
+      <p class="text-3xl font-black text-indigo-600"><span id="print-score">--</span> <span class="text-xs font-normal text-slate-400">/ 100</span></p>
+    </div>
+  </div>
+
+  <!-- Radar Chart & Summary Grid -->
+  <div class="grid grid-cols-2 gap-5 page-break">
+    <div class="border border-slate-200 rounded-xl p-4">
+      <h3 class="text-xs font-bold text-slate-700 mb-2">16 维能力雷达分布 (vs 团队均分)</h3>
+      <div id="print-radar" style="height: 270px;"></div>
+    </div>
+    <div class="border border-slate-200 rounded-xl p-4 flex flex-col justify-between">
+      <div>
+        <h3 class="text-xs font-bold text-slate-700 mb-2">专家综合总体评述</h3>
+        <p id="print-summary" class="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 min-h-[90px]">
+          正在加载候选人全维评测诊断报告...
+        </p>
+      </div>
+      <div class="grid grid-cols-2 gap-2.5 mt-2.5 text-[11px]">
+        <div class="bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
+          <p class="font-bold text-emerald-800 mb-1">🌟 核心优势</p>
+          <ul id="print-strengths" class="text-emerald-900 space-y-0.5 list-disc list-inside"></ul>
+        </div>
+        <div class="bg-indigo-50 p-2.5 rounded-lg border border-indigo-100">
+          <p class="font-bold text-indigo-800 mb-1">🚀 发展建议</p>
+          <ul id="print-suggestions" class="text-indigo-900 space-y-0.5 list-disc list-inside"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 16 Dimensions Score Table -->
+  <div class="border border-slate-200 rounded-xl p-4 page-break">
+    <h3 class="text-xs font-bold text-slate-700 mb-2.5">16 维能力细分得分清单</h3>
+    <table class="w-full text-left text-[11px]">
+      <thead>
+        <tr class="border-b border-slate-200 text-slate-400 font-semibold">
+          <th class="pb-1.5">能力维度</th>
+          <th class="pb-1.5">个人得分</th>
+          <th class="pb-1.5">团队均分</th>
+          <th class="pb-1.5">全场排名</th>
+          <th class="pb-1.5">图论量化行为证据</th>
+        </tr>
+      </thead>
+      <tbody id="print-table-body" class="divide-y divide-slate-100">
+        <!-- Rows dynamically injected -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    let radarInstance = null;
+
+    function renderRadar(radarData) {
+      if (!radarInstance) {
+        radarInstance = echarts.init(document.getElementById('print-radar'));
+      }
+      const indicators = (radarData || []).map(d => ({ name: d.dimension_name, max: 100 }));
+      const personScores = (radarData || []).map(d => d.score);
+      const teamAvgScores = (radarData || []).map(d => d.team_avg);
+
+      radarInstance.setOption({
+        radar: {
+          indicator: indicators,
+          radius: '64%',
+          splitNumber: 4,
+          axisName: { fontSize: 8.5, color: '#475569' }
+        },
+        series: [{
+          type: 'radar',
+          data: [
+            { value: personScores, name: '个人得分', itemStyle: { color: '#4F46E5' }, areaStyle: { color: 'rgba(79,70,229,0.2)' } },
+            { value: teamAvgScores, name: '团队均分', itemStyle: { color: '#94A3B8' }, lineStyle: { type: 'dashed' } }
+          ]
+        }]
+      });
+    }
+
+    function hydrateCandidateData(p, reportData) {
+      document.getElementById('print-name').textContent = p.display_name;
+      document.getElementById('print-rank').textContent = `全场综合第 ${p.overall_rank} 名 / 共 ${reportData.participants.length} 人`;
+      document.getElementById('print-score').textContent = p.total_score;
+
+      const tagsContainer = document.getElementById('print-tags');
+      tagsContainer.innerHTML = (p.diagnosis.tags || []).map(t =>
+        `<span class="px-2 py-0.5 rounded bg-white border border-slate-200 text-xs text-slate-600 font-medium"># ${t}</span>`
+      ).join('');
+
+      document.getElementById('print-summary').textContent = p.diagnosis.summary || "暂无评语";
+      document.getElementById('print-strengths').innerHTML = (p.diagnosis.strengths || []).slice(0, 2).map(s => `<li>${s}</li>`).join('');
+      document.getElementById('print-suggestions').innerHTML = (p.diagnosis.growth_suggestions || []).slice(0, 2).map(g => `<li>${g}</li>`).join('');
+
+      const tbody = document.getElementById('print-table-body');
+      tbody.innerHTML = (p.radar_data || []).map(r => {
+        const detail = p.dimension_details ? p.dimension_details[r.dimension_id] : null;
+        const kp = detail && detail.key_points && detail.key_points.length ? detail.key_points[0] : "-";
+        const rank = detail ? `第 ${detail.rank} 名` : "-";
+        return `
+          <tr>
+            <td class="py-1 font-medium">${r.dimension_name} (${r.dimension_id})</td>
+            <td class="py-1 font-bold text-indigo-600">${r.score}</td>
+            <td class="py-1 text-slate-500">${r.team_avg}</td>
+            <td class="py-1">${rank}</td>
+            <td class="py-1 text-slate-600 max-w-xs truncate">${kp}</td>
+          </tr>
+        `;
+      }).join('');
+
+      renderRadar(p.radar_data);
+    }
+
+    async function initPage() {
+      // 提取 task_id 和 speaker_id
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      let taskId = null;
+      let speakerId = null;
+
+      if (parts.length >= 3 && parts[0] === 'report-print') {
+        taskId = parts[1];
+        speakerId = parts[2];
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      taskId = params.get('task_id') || taskId;
+      speakerId = params.get('speaker_id') || speakerId;
+
+      document.getElementById('print-date').textContent = `报告生成: ${new Date().toISOString().slice(0, 10)}`;
+
+      if (taskId) {
+        try {
+          const resp = await fetch(`/api/v1/assessment/${taskId}/data`);
+          if (resp.ok) {
+            const data = await resp.json();
+            const participant = data.participants.find(p => p.speaker_id === speakerId) || data.participants[0];
+            if (participant) {
+              hydrateCandidateData(participant, data);
+              window.reportReady = true;
+              return;
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load report dynamically:", e);
+        }
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', initPage);
+  </script>
+</body>
+</html>
