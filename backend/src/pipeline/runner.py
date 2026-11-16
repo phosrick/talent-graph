@@ -56,7 +56,7 @@ class PipelineRunner:
         self.embedding = embedding_engine or get_embedding_engine(self.settings)
         self.cache_manager = cache_manager or get_graph_cache_manager(self.settings)
 
-        self.parser = DiscussionParser()
+        self.parser = DiscussionParser(host_speaker_id=self.settings.host_speaker_id)
         self.interaction_extractor = InteractionExtractor(llm_client=self.llm, settings=self.settings)
         self.node_matcher = CandidateNodeMatcher(
             llm_client=self.llm,
@@ -156,8 +156,8 @@ class PipelineRunner:
         if not d_path.exists():
             raise FileNotFoundError(f"Discussion file not found: {d_path}")
 
-        c_text = c_path.read_text(encoding="utf-8")
-        d_text = d_path.read_text(encoding="utf-8")
+        c_text = DiscussionParser.read_text_with_fallback(c_path)
+        d_text = DiscussionParser.read_text_with_fallback(d_path)
 
         gid = group_id or d_path.stem
         cid = corpus_id or c_path.stem

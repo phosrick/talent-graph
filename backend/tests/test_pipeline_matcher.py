@@ -137,6 +137,34 @@ async def test_dual_pruned_arc_verifier(mock_standard_graph, mock_speakers):
 
 
 @pytest.mark.asyncio
+async def test_arc_verifier_rejects_unreturned_and_false_arcs(mock_standard_graph, mock_speakers):
+    """验证边校验器严格拒绝 is_valid=False 及 LLM 未返回的候选边（修复原默认放行 Bug）"""
+    cand_graph = CandidateGraph(
+        speaker_id="speaker_2",
+        matched_nodes=[
+            mock_standard_graph.get_node("c1"),
+            mock_standard_graph.get_node("d1"),
+            mock_standard_graph.get_node("u1"),
+        ],
+        node_mentions=[],
+    )
+    mock_llm = MagicMock(spec=LLMClient)
+    # 仅返回 c1->d1 为 True，省略 d1->u1
+    mock_llm.chat_json = AsyncMock(
+        return_value=ArcVerificationPayload(
+            verified_arcs=[
+                ArcVerificationItem(source="c1", target="d1", is_valid=True),
+            ]
+        )
+    )
+    verifier = CandidateArcVerifier(llm_client=mock_llm)
+    verified = await verifier.verify_arcs_for_speaker(mock_speakers[0], cand_graph, mock_standard_graph)
+    assert len(verified) == 1
+    assert verified[0].source == "c1" and verified[0].target == "d1"
+
+
+
+@pytest.mark.asyncio
 async def test_pipeline_runner_end_to_end(mock_standard_graph, tmp_path):
     # Mock LLM and Cache
     mock_llm = MagicMock(spec=LLMClient)

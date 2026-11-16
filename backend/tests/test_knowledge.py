@@ -120,3 +120,55 @@ async def test_adaptive_chunking_for_long_corpus():
         assert a.source != a.target
         assert graph.get_node(a.source) is not None
         assert graph.get_node(a.target) is not None
+
+
+@pytest.mark.asyncio
+async def test_v5_hierarchy_and_cross_chunk_completion():
+    """验证 V5 一二三级抽象层级、parent_concept 自动挂靠、根因边过滤与跨分块骨架补边"""
+    from src.knowledge.extractor import CrossChunkArcItem, CrossChunkArcPayload
+
+    mock_llm = MagicMock()
+    c1_payload = GraphExtractionPayload(
+        title="银行支行转型案例",
+        nodes=[
+            {"id": "c1", "name": "支行经营转型战略", "type": "c", "level": "一级", "sub_type": "known"},
+            {"id": "c2", "name": "同业竞争加剧机制", "type": "c", "level": "二级", "sub_type": "known"},
+            {"id": "c3", "name": "近三年网点业绩持续下滑", "type": "c", "level": "三级", "sub_type": "known", "is_root": True},
+        ],
+        arcs=[{"source": "c2", "target": "c3", "type": "causal"}],  # 指向 is_root=True 的因果边应被自动过滤！
+    )
+    c2_payload = GraphExtractionPayload(
+        title="银行支行转型案例",
+        nodes=[
+            {"id": "d1", "name": "开展新业务专项培训", "type": "d", "level": "三级"},
+            {"id": "u1", "name": "提升员工服务意识", "type": "u", "level": "二级", "sub_type": "instrumental"},
+            {"id": "u2", "name": "实现网点利润正增长", "type": "u", "level": "一级", "sub_type": "final"},
+        ],
+        arcs=[
+            {"source": "d1", "target": "u1", "type": "causal"},
+            {"source": "u1", "target": "u2", "type": "causal"},
+        ],
+    )
+    cross_payload = CrossChunkArcPayload(
+        arcs=[CrossChunkArcItem(source="c3", target="d1", type="info")]
+    )
+
+    mock_llm.chat_json = AsyncMock(side_effect=[c1_payload, c2_payload, cross_payload])
+    settings = Settings(corpus_auto_chunk_threshold=100, corpus_chunk_size=110, corpus_chunk_overlap=10)
+    extractor = StandardGraphExtractor(llm_client=mock_llm, settings=settings)
+
+    text = ("第一段：支行近三年面临同业竞争加剧，网点业绩持续下滑，亟需转型。\n\n"
+            "第二段：应当立即开展新业务专项培训以提升员工服务意识，最终实现网点利润正增长。") * 2
+    graph = await extractor.extract_graph(text, corpus_id="bank_case")
+
+    assert graph.has_explicit_levels
+    assert len(graph.final_target_ids) == 1
+    assert len(graph.instrumental_target_ids) == 1
+    # 三级节点自动挂靠到二级概念 parent_concept
+    l3_nodes = [n for n in graph.nodes if n.level == "三级"]
+    assert all(bool(n.parent_concept) for n in l3_nodes)
+    # 指向 root 节点的非法因果边已被过滤，且跨分块 info 边已被补上
+    root_ids = {n.id for n in graph.nodes if n.is_root}
+    assert all(not (a.type == "causal" and a.target in root_ids) for a in graph.arcs)
+    assert any(a.type == "info" for a in graph.arcs)
+

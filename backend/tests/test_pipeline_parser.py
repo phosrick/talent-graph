@@ -46,6 +46,22 @@ def test_discussion_parser():
     assert spk1.is_host
 
 
+def test_auto_host_preserves_real_candidate_1_and_inline_turns():
+    """验证 auto 模式不会误删真实参评的 1 号候选人，且支持单行内联发言格式"""
+    unmoderated_text = """
+    说话人 1 00:05 我认为支行业绩下滑的核心原因是产品老化，建议立刻梳理高收益理财新业务并加强员工激励。
+    说话人 2 00:45 我同意1号的判断，除此之外还要加强周边社区的网格化获客营销。
+    """
+    parser = DiscussionParser(host_speaker_id="auto")
+    transcript = parser.parse_text(unmoderated_text, group_id="unmod_group")
+
+    assert len(transcript.speakers) == 2
+    assert len(transcript.candidate_speakers) == 2
+    assert not transcript.speakers["speaker_1"].is_host
+    assert "speaker_1" in [s.speaker_id for s in transcript.candidate_speakers]
+
+
+
 @pytest.mark.asyncio
 async def test_interaction_extractor_mock_and_heuristic():
     parser = DiscussionParser(host_speaker_id="speaker_1")
