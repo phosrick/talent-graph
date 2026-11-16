@@ -151,3 +151,17 @@ def test_collaboration_centrality_support_ranking(mock_scoring_context):
     s3_53 = matrix.participants["speaker_3"].dimension_scores["5_3"].score
     assert s2_53 > s3_53, f"Speaker 2 with incoming support ({s2_53}) should score higher than Speaker 3 ({s3_53}) on 5_3"
 
+
+def test_v5_hawkes_and_convergence_metrics(mock_scoring_context):
+    """验证 4 思维激发 Hawkes 互激点过程参数与 6_3 向量收敛推进量 Δ 指标正常输出"""
+    engine = ScoringEngine()
+    matrix = engine.evaluate_all(mock_scoring_context)
+
+    m4_spk2 = matrix.participants["speaker_2"].dimension_scores["4"].metrics
+    assert "hawkes_peer_excitation" in m4_spk2
+    assert m4_spk2["hawkes_peer_excitation"] > 0.0
+
+    m63_spk2 = matrix.participants["speaker_2"].dimension_scores["6_3"].metrics
+    assert "v5_convergence_delta" in m63_spk2
+
+
