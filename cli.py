@@ -38,6 +38,28 @@ app = typer.Typer(
 console = Console()
 
 
+@app.command(name="download-model")
+def download_model(
+    target_dir: Optional[Path] = typer.Option(None, "--dir", "-d", help="自定义 ONNX 模型保存目录"),
+):
+    """【模型下载】一键下载 ~25MB 纯 CPU 量化版 BAAI/bge-small-zh-v1.5 ONNX 语义向量模型（零 PyTorch/零 GPU）"""
+    from src.core.embedding import EmbeddingEngine
+
+    console.print("[bold cyan]📥 正在下载纯 CPU INT8 量化版 BGE 中文句向量 ONNX 模型...[/bold cyan]")
+    saved_dir = EmbeddingEngine.download_onnx_model(target_dir=target_dir)
+    engine = EmbeddingEngine()
+    vec = engine.embed_text("无领导小组讨论语义向量自检")
+    console.print(
+        Panel(
+            f"[bold green]ONNX 语义向量模型就绪！[/bold green]\n\n"
+            f"• 存储路径: [cyan]{saved_dir}[/cyan]\n"
+            f"• 生效后端: [yellow]{engine.backend_mode}[/yellow]\n"
+            f"• 向量维度: [bold]{vec.shape[0]}[/bold] (L2 Norm={float((vec**2).sum()**0.5):.4f})",
+            title="⚡ 纯 CPU 神经网络向量引擎",
+        )
+    )
+
+
 @app.command(name="prepare")
 def prepare(
     corpus: Path = typer.Option(..., "--corpus", "-c", help="案例参考答案文本文件路径 (corpus.txt)"),

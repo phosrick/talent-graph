@@ -134,7 +134,7 @@ class LLMClient:
         response_model: Type[T],
         system_prompt: str = "You are an expert AI assistant that responds in strict JSON format.",
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
         model: Optional[str] = None,
     ) -> T:
         """结构化 JSON 提取并自动映射为 Pydantic 数据模型"""

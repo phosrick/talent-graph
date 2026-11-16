@@ -91,14 +91,22 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # 2. 向量计算配置 (纯 CPU 轻量 ONNX 或 API)
     # -------------------------------------------------------------------------
-    embedding_provider: Literal["onnx", "api", "bge", "local", "mock"] = Field(
+    embedding_provider: Literal["onnx", "api", "bge", "local", "auto", "mock"] = Field(
         default="onnx",
-        description="向量计算引擎提供商",
+        description="向量计算引擎提供商: onnx(本地CPU ONNX) | api(百炼/OpenAI向量API) | auto(自动优选)",
     )
     embedding_model: str = Field(
         default="BAAI/bge-small-zh-v1.5",
         validation_alias=AliasChoices("embedding_model", "bge_model_name"),
-        description="向量模型名称或本地目录",
+        description="向量模型名称或本地 ONNX 目录/文件路径",
+    )
+    dashscope_embedding_model: str = Field(
+        default="text-embedding-v3",
+        description="阿里云百炼云端向量模型名称 (512维)",
+    )
+    openai_embedding_model: str = Field(
+        default="text-embedding-3-small",
+        description="OpenAI 云端向量模型名称 (512维)",
     )
     embedding_batch_size: int = Field(
         default=32,
@@ -116,16 +124,30 @@ class Settings(BaseSettings):
         le=1.0,
     )
     corpus_auto_chunk_threshold: int = Field(
-        default=5000,
+        default=4500,
         description="触发自适应分块抽取的参考语料长度阈值 (字符数)",
     )
     corpus_chunk_size: int = Field(
-        default=3000,
+        default=2800,
         description="超长参考语料分块大小 (字符数)",
     )
     corpus_chunk_overlap: int = Field(
         default=300,
         description="超长参考语料分块重叠大小 (字符数)",
+    )
+    enable_corpus_smoothing: bool = Field(
+        default=False,
+        description="是否对参考语料启用高并发 ASR 语音纠错润滑 (纯文字题本默认关闭以0秒直通)",
+    )
+    node_match_batch_size: int = Field(
+        default=70,
+        description="超大规模标准图谱下候选人节点匹配的单批节点上限 (防止长Prompt漏召回或截断)",
+        ge=20,
+        le=200,
+    )
+    host_speaker_id: str = Field(
+        default="auto",
+        description="主持人标识: 'auto'=智能检测主持人避免误删1号选手, ''=全员参评无主持人, 或指定如 'speaker_1'",
     )
     data_root_dir: Path = Field(
         default=DEFAULT_DATA_ROOT,

@@ -82,3 +82,17 @@ def test_compute_similarity():
     assert len(sims) == 2
     assert sims[0] > sims[1]
 
+
+def test_synonym_alignment_and_jump_distance():
+    """验证跨表述同义词根对齐与 V5 节点序列语义跳跃距离"""
+    engine = get_embedding_engine()
+    v1 = engine.embed_text("裁员降本")
+    v2 = engine.embed_text("优化人力与削减成本")
+    v3 = engine.embed_text("今天天气晴朗适合郊游")
+    assert engine.cosine_similarity(v1, v2) > 0.35
+    assert engine.cosine_similarity(v1, v2) > engine.cosine_similarity(v1, v3)
+
+    jump = engine.compute_sequence_jump_distance(["削减运营成本", "拓展海外高端品牌形象", "升级数字化风控系统"])
+    assert jump > 0.5
+
+

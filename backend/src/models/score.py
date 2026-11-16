@@ -47,6 +47,8 @@ class DimensionScore(BaseModel):
     raw_score: float = Field(default=0.0, description="原始数学图论计算指标值")
     rank: int = Field(default=1, description="全场该维度排名 (1 为最高)")
     key_points: List[str] = Field(default_factory=list, description="得分佐证要点或高光表现")
+    advantages: List[str] = Field(default_factory=list, description="该子维度优势表现 (对齐 V5 refined_summary advantage)")
+    to_improve: List[str] = Field(default_factory=list, description="该子维度待提升项 (对齐 V5 refined_summary toImprove)")
     metrics: Dict[str, Any] = Field(default_factory=dict, description="量化图论细分特征指标")
 
 

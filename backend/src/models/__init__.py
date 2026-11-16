@@ -8,6 +8,7 @@ from src.models.graph import (
     ArcType,
     CandidateGraph,
     Node,
+    NodeLevel,
     NodeMention,
     NodeType,
     StandardGraph,
@@ -31,6 +32,7 @@ from src.models.score import (
 from src.models.report import (
     CollaborationNetworkDTO,
     ComprehensiveDiagnosis,
+    DimensionFeedback,
     ParticipantReport,
     RadarPoint,
     ReportData,
@@ -41,6 +43,7 @@ __all__ = [
     # Graph
     "Node",
     "NodeType",
+    "NodeLevel",
     "Arc",
     "ArcType",
     "StandardGraph",
@@ -62,6 +65,7 @@ __all__ = [
     "ScoreMatrix",
     # Report
     "RadarPoint",
+    "DimensionFeedback",
     "ComprehensiveDiagnosis",
     "ParticipantReport",
     "CollaborationNetworkDTO",

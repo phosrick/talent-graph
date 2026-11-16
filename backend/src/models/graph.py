@@ -7,15 +7,23 @@ from typing import Any, Dict, List, Literal, Optional, Set
 import networkx as nx
 from pydantic import BaseModel, Field, model_validator
 
-NodeType = Literal["c", "d", "u"]  # c: concept(概念/事实), d: decision(决策/方案), u: utility(效用/目标)
+NodeType = Literal["c", "d", "u"]  # c: concept/chance(信息/事实), d: decision(决策/方案), u: utility(效用/目标)
+NodeLevel = Literal["一级", "二级", "三级"]  # 一级: 宏观主题, 二级: 抽象概念, 三级: 具体事实/措施
 ArcType = Literal["causal", "info", "update"]  # 因果边, 信息边, 更新边
 
 
 class Node(BaseModel):
-    """图谱知识节点"""
+    """图谱知识节点 (完整保留 V5 影响图正交属性: 类型 + 抽象层级 + 细分角色)"""
     id: str = Field(..., description="节点唯一标识，如 c1, d2, u1")
     name: str = Field(..., description="节点短名称")
-    type: NodeType = Field(..., description="节点类型: c=概念/事实, d=决策/方案, u=效用/目标")
+    type: NodeType = Field(..., description="节点类型: c=信息/事实, d=决策/方案, u=效用/目标")
+    level: NodeLevel = Field(default="三级", description="抽象层级: 一级(宏观主题) / 二级(抽象概念) / 三级(具体案例事实)")
+    sub_type: str = Field(
+        default="",
+        description="节点子分类: c节点为 known(已知)/unknown(未知); u节点为 final(最终目标)/instrumental(手段目标)",
+    )
+    is_root: bool = Field(default=False, description="是否为根因信息节点 (Root Chance Node)")
+    parent_concept: str = Field(default="", description="三级具体节点挂靠的二级抽象概念名称或ID")
     description: str = Field(default="", description="节点详细说明/内涵")
     keywords: List[str] = Field(default_factory=list, description="关键词列表")
     category: Optional[str] = Field(default=None, description="所属分类")
@@ -27,6 +35,8 @@ class Node(BaseModel):
             prefix = self.id[0].lower()
             if prefix in {"c", "d", "u"}:
                 self.type = prefix  # type: ignore
+        if self.level == "二级" and not self.parent_concept:
+            self.parent_concept = self.name
         return self
 
 
@@ -69,6 +79,31 @@ class StandardGraph(BaseModel):
         """按类型筛选节点 (c, d, u)"""
         return [n for n in self.nodes if n.type == node_type]
 
+    @property
+    def has_explicit_levels(self) -> bool:
+        """检查图谱是否包含显式的抽象层级划分 (一级/二级)"""
+        return any(n.level in ("一级", "二级") for n in self.nodes)
+
+    @property
+    def concept_node_ids(self) -> Set[str]:
+        """概念节点集合 (一级 + 二级)"""
+        return {n.id for n in self.nodes if n.level in ("一级", "二级")}
+
+    @property
+    def fact_node_ids(self) -> Set[str]:
+        """事实/具体节点集合 (三级)"""
+        return {n.id for n in self.nodes if n.level == "三级"}
+
+    @property
+    def final_target_ids(self) -> Set[str]:
+        """最终目标节点集合 (u 且 sub_type='final')"""
+        return {n.id for n in self.nodes if n.type == "u" and n.sub_type == "final"}
+
+    @property
+    def instrumental_target_ids(self) -> Set[str]:
+        """手段目标节点集合 (u 且 sub_type='instrumental')"""
+        return {n.id for n in self.nodes if n.type == "u" and n.sub_type == "instrumental"}
+
     def to_networkx(self) -> nx.DiGraph:
         """转换为 NetworkX 有向图，供纯数学评分器极速计算"""
         G = nx.DiGraph()
@@ -77,6 +112,10 @@ class StandardGraph(BaseModel):
                 node.id,
                 name=node.name,
                 type=node.type,
+                level=node.level,
+                sub_type=node.sub_type,
+                is_root=node.is_root,
+                parent_concept=node.parent_concept,
                 description=node.description,
                 keywords=node.keywords,
             )
@@ -99,11 +138,18 @@ class StandardGraph(BaseModel):
             node_type = data.get("type", "c")
             if node_type not in {"c", "d", "u"}:
                 node_type = n_id[0].lower() if n_id and n_id[0].lower() in {"c", "d", "u"} else "c"
+            level = data.get("level", "三级")
+            if level not in {"一级", "二级", "三级"}:
+                level = "三级"
             nodes.append(
                 Node(
                     id=str(n_id),
                     name=data.get("name", str(n_id)),
                     type=node_type,
+                    level=level,
+                    sub_type=data.get("sub_type", ""),
+                    is_root=bool(data.get("is_root", False)),
+                    parent_concept=data.get("parent_concept", ""),
                     description=data.get("description", ""),
                     keywords=data.get("keywords", []),
                 )
@@ -139,6 +185,18 @@ class CandidateGraph(BaseModel):
     node_mentions: List[NodeMention] = Field(default_factory=list)
     verified_arcs: List[Arc] = Field(default_factory=list)
     novel_nodes: List[Node] = Field(default_factory=list, description="提出的标准库之外创新节点")
+    feasibility_ratings: Dict[str, float] = Field(
+        default_factory=dict,
+        description="3_3 方案可行性四维评分 (resource_awareness, risk_sensitivity, execution_feasibility, adaptability)",
+    )
+    openness_counts: Dict[str, int] = Field(
+        default_factory=dict,
+        description="5_1 开放度四维行为计数 (listening, supporting, analysis, pushing)",
+    )
+    timing_control_count: Optional[int] = Field(
+        default=None,
+        description="6_2 控时与议程节奏管理显式次数",
+    )
 
     @property
     def matched_node_ids(self) -> Set[str]:
@@ -148,7 +206,7 @@ class CandidateGraph(BaseModel):
         """构建候选人个人拓扑子图"""
         G = nx.DiGraph()
         for node in self.matched_nodes + self.novel_nodes:
-            G.add_node(node.id, name=node.name, type=node.type)
+            G.add_node(node.id, name=node.name, type=node.type, level=node.level, sub_type=node.sub_type)
         for arc in self.verified_arcs:
             G.add_edge(arc.source, arc.target, type=arc.type, weight=arc.weight)
         return G

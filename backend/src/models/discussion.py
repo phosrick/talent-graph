@@ -53,6 +53,7 @@ class InteractionEdge(BaseModel):
     weight: float = Field(default=1.0, description="互动强度或频次")
     evidence: str = Field(default="", description="提取依据语句片段")
     utterance_index: Optional[int] = Field(default=None, description="发生的发言次序号")
+    timestamp_seconds: float = Field(default=0.0, description="互动发生时间戳(秒)")
 
 
 class InteractionNetwork(BaseModel):
@@ -61,18 +62,28 @@ class InteractionNetwork(BaseModel):
     edges: List[InteractionEdge] = Field(default_factory=list, description="全部互动边")
 
     def to_networkx(self) -> nx.DiGraph:
-        """构建 NetworkX 加权有向互动图，供 5_3 等中心性算法瞬间完成计算"""
+        """构建 NetworkX 加权有向互动图，供 5_3 等中心性算法瞬间完成计算 (对齐 V5 协作网络有向加权)"""
         G = nx.DiGraph()
         for spk in self.speakers:
             G.add_node(spk)
         for e in self.edges:
-            # 如果已存在多条边，累加权重
+            signed_w = e.weight if e.type == "support" else (-e.weight if e.type == "deny" else 0.5 * e.weight)
+            # 如果已存在多条边，累加权重与带符号协作权重
             if G.has_edge(e.source, e.target):
                 G[e.source][e.target]["weight"] += e.weight
+                G[e.source][e.target]["signed_weight"] = G[e.source][e.target].get("signed_weight", 0.0) + signed_w
                 if e.type not in G[e.source][e.target].get("types", []):
                     G[e.source][e.target]["types"].append(e.type)
             else:
-                G.add_edge(e.source, e.target, weight=e.weight, type=e.type, types=[e.type], evidence=e.evidence)
+                G.add_edge(
+                    e.source,
+                    e.target,
+                    weight=e.weight,
+                    signed_weight=signed_w,
+                    type=e.type,
+                    types=[e.type],
+                    evidence=e.evidence,
+                )
         return G
 
 
@@ -80,6 +91,8 @@ class DiscussionTranscript(BaseModel):
     """讨论全程结构化转录文本数据集"""
     group_id: str = Field(default="", description="讨论小组标识，如 271_1")
     title: str = Field(default="", description="讨论场次主题")
+    core_topic: str = Field(default="", description="6_1 提炼出的讨论核心议题焦点")
+    convergence_decision: str = Field(default="", description="6_3 讨论最终收敛达成的共识决议")
     speakers: Dict[str, Speaker] = Field(default_factory=dict, description="候选人字典 (speaker_id -> Speaker)")
     utterances: List[Utterance] = Field(default_factory=list, description="按时间线排列的全局发言序列")
     total_duration_seconds: float = Field(default=0.0, description="讨论总时长(秒)")

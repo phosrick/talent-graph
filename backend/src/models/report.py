@@ -19,13 +19,27 @@ class RadarPoint(BaseModel):
     team_avg: float = Field(..., description="团队平均分")
 
 
+class DimensionFeedback(BaseModel):
+    """单子维度优劣势诊断要点 (对齐 V5 bullet_points)"""
+    advantage: List[str] = Field(default_factory=list, description="该维度优势要点")
+    toImprove: List[str] = Field(default_factory=list, description="该维度待改进要点")
+
+
 class ComprehensiveDiagnosis(BaseModel):
-    """个人全维综合诊断评价 (LLM 一次性生成)"""
+    """个人全维综合诊断评价 (LLM 一次性并发生成，完整对齐 V5 七段综述 + 子维优劣势)"""
     summary: str = Field(default="", description="全场整体综合表现评价")
-    strengths: List[str] = Field(default_factory=list, description="核心优势与高光表现 (2~3条)")
-    weaknesses: List[str] = Field(default_factory=list, description="主要薄弱环节与待改进项 (1~2条)")
+    strengths: List[str] = Field(default_factory=list, description="核心优势与高光表现 (2~4条)")
+    weaknesses: List[str] = Field(default_factory=list, description="主要薄弱环节与待改进项 (2~3条)")
     growth_suggestions: List[str] = Field(default_factory=list, description="针对性成长与能力进阶建议 (2~3条)")
     tags: List[str] = Field(default_factory=list, description="人才个性化核心特征标签 (如 破局引领者, 严谨推演者)")
+    category_summaries: Dict[str, str] = Field(
+        default_factory=dict,
+        description="六大能力大类专项评述 (思维能力/决策能力/创新能力/思维激发/冲突协调/推进能力)",
+    )
+    dimension_feedback: Dict[str, DimensionFeedback] = Field(
+        default_factory=dict,
+        description="16个子维度的细粒度 advantage / toImprove 要点映射",
+    )
 
 
 class ParticipantReport(BaseModel):
