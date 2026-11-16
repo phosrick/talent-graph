@@ -133,7 +133,10 @@
       const tbody = document.getElementById('print-table-body');
       tbody.innerHTML = (p.radar_data || []).map(r => {
         const detail = p.dimension_details ? p.dimension_details[r.dimension_id] : null;
-        const kp = detail && detail.key_points && detail.key_points.length ? detail.key_points[0] : "-";
+        const adv = detail && detail.advantages && detail.advantages.length
+          ? detail.advantages[0]
+          : (detail && detail.key_points && detail.key_points.length ? detail.key_points[0] : "-");
+        const imp = detail && detail.to_improve && detail.to_improve.length ? ` | 待提升: ${detail.to_improve[0]}` : "";
         const rank = detail ? `第 ${detail.rank} 名` : "-";
         return `
           <tr>
@@ -141,7 +144,7 @@
             <td class="py-1 font-bold text-indigo-600">${r.score}</td>
             <td class="py-1 text-slate-500">${r.team_avg}</td>
             <td class="py-1">${rank}</td>
-            <td class="py-1 text-slate-600 max-w-xs truncate">${kp}</td>
+            <td class="py-1 text-slate-600 max-w-xs truncate">${adv}${imp}</td>
           </tr>
         `;
       }).join('');

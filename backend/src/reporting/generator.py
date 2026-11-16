@@ -115,6 +115,26 @@ class ReportGenerator:
             cand_graph = pipeline_result.candidate_graphs.get(spk_id)
             diag = diagnoses.get(spk_id, ComprehensiveDiagnosis())
 
+            # 将 LLM 子维度诊断优劣势回填至每个 DimensionScore (兼容 V5 advantage / toImprove 明细)
+            for dim_def in ALL_DIMENSIONS:
+                dim_id = dim_def.id
+                ds_obj = profile.dimension_scores.get(dim_id)
+                if ds_obj is None:
+                    continue
+                fb = diag.dimension_feedback.get(dim_id) if diag.dimension_feedback else None
+                t_avg = score_matrix.dimension_averages.get(dim_id, 75.0)
+                short_name = dim_def.name.split(" - ")[-1]
+                if fb and (fb.advantage or fb.toImprove):
+                    ds_obj.advantages = fb.advantage or ds_obj.key_points[:2]
+                    ds_obj.to_improve = fb.toImprove
+                else:
+                    ds_obj.advantages = list(ds_obj.key_points[:2]) or [f"{short_name}表现平稳"]
+                    ds_obj.to_improve = (
+                        [f"可在复杂情境下进一步深化{short_name}的应用"]
+                        if ds_obj.score >= t_avg
+                        else [f"{short_name}得分低于组内均值({t_avg})，建议针对性加强练习"]
+                    )
+
             # 组装雷达图数据
             radar_points: List[RadarPoint] = []
             for dim_def in ALL_DIMENSIONS:
